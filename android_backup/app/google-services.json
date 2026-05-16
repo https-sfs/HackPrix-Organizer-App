@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "289441248174",
+    "project_id": "hackprix-checkin",
+    "storage_bucket": "hackprix-checkin.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:289441248174:android:808573c0599f70ed498e3f",
+        "android_client_info": {
+          "package_name": "com.example.hackprix_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAGF0pe4n9DARa3-h91aZvierWlozsSJbo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
