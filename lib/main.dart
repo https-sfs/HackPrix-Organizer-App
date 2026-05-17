@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'seat_screen.dart';
 
-// If you already have an admin screen file, you can plug it in later.
-// For now, the organizer panel below gives us the hidden access structure.
+
 
 void main() {
   runApp(const HackPrixApp());
@@ -14,7 +13,7 @@ class HackPrixColors {
   static const card = Colors.white;
   static const text = Color(0xFF10203A);
 
-  // HackPrix website palette inspired accents
+  
   static const orange = Color(0xFFFF9B2F);
   static const lime = Color(0xFFB7E200);
   static const cyan = Color(0xFF18C7F2);
@@ -126,7 +125,7 @@ class _ParticipantShellState extends State<ParticipantShell> {
             ),
             FilledButton(
               onPressed: () {
-                if (pinController.text.trim() == '190980860304') {
+                if (pinController.text.trim() == '') {
                   Navigator.pop(context);
                   Navigator.push(
                     context,
