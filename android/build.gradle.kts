@@ -1,44 +1,29 @@
 plugins {
-    id("com.android.application")
-    id("kotlin-android")
-    id("dev.flutter.flutter-gradle-plugin")
-    id("com.google.gms.google-services")
+    id("com.google.gms.google-services") version "4.4.4" apply false
 }
 
-android {
-    namespace = "com.example.hackprix_app"
-    compileSdk = flutter.compileSdkVersion
-    ndkVersion = flutter.ndkVersion
-
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
-        isCoreLibraryDesugaringEnabled = true
-    }
-
-    kotlinOptions {
-        jvmTarget = JavaVersion.VERSION_11.toString()
-    }
-
-    defaultConfig {
-        applicationId = "com.example.hackprix_app"
-        minSdk = flutter.minSdkVersion
-        targetSdk = flutter.targetSdkVersion
-        versionCode = flutter.versionCode
-        versionName = flutter.versionName
-    }
-
-    buildTypes {
-        release {
-            signingConfig = signingConfigs.getByName("debug")
-        }
+allprojects {
+    repositories {
+        google()
+        mavenCentral()
     }
 }
 
-dependencies {
-    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
+val newBuildDir: Directory =
+    rootProject.layout.buildDirectory
+        .dir("../../build")
+        .get()
+rootProject.layout.buildDirectory.value(newBuildDir)
+
+subprojects {
+    val newSubprojectBuildDir: Directory = newBuildDir.dir(project.name)
+    project.layout.buildDirectory.value(newSubprojectBuildDir)
 }
 
-flutter {
-    source = "../.."
+subprojects {
+    project.evaluationDependsOn(":app")
+}
+
+tasks.register<Delete>("clean") {
+    delete(rootProject.layout.buildDirectory)
 }
