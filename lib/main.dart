@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'notification_service.dart';
 import 'seat_reset_service.dart';
 import 'seat_screen.dart';
 import 'organizer_notification_screen.dart';
@@ -9,6 +11,8 @@ import 'admin_screen.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
+  FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+  await NotificationService.instance.initialize();
   runApp(const HackPrixApp());
 }
 
@@ -130,7 +134,7 @@ class _ParticipantShellState extends State<ParticipantShell> {
             ),
             FilledButton(
               onPressed: () {
-                if (pinController.text.trim() == '') {
+                if (pinController.text.trim() == '19090304') {
                   Navigator.pop(context);
                   Navigator.push(
                     context,
