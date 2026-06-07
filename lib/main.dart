@@ -1,9 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'seat_reset_service.dart';
 import 'seat_screen.dart';
+import 'organizer_notification_screen.dart';
+import 'announcements_screen.dart';
+import 'admin_screen.dart';
 
-
-
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp();
   runApp(const HackPrixApp());
 }
 
@@ -307,14 +312,14 @@ class ParticipantHomePage extends StatelessWidget {
             crossAxisSpacing: 14,
             mainAxisSpacing: 14,
             childAspectRatio: 1.2,
-            children: const [
-              FeatureTile(
+            children: [
+              const FeatureTile(
                 title: 'My Seat',
                 subtitle: 'Your lab + seat',
                 icon: Icons.event_seat,
                 accent: HackPrixColors.orange,
               ),
-              FeatureTile(
+              const FeatureTile(
                 title: 'Schedule',
                 subtitle: 'Day-wise flow',
                 icon: Icons.schedule,
@@ -325,8 +330,16 @@ class ParticipantHomePage extends StatelessWidget {
                 subtitle: 'Live updates',
                 icon: Icons.campaign,
                 accent: HackPrixColors.purple,
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const AnnouncementsScreen(),
+                    ),
+                  );
+                },
               ),
-              FeatureTile(
+              const FeatureTile(
                 title: 'Guidelines',
                 subtitle: 'Rules & help',
                 icon: Icons.menu_book,
@@ -363,6 +376,7 @@ class FeatureTile extends StatelessWidget {
   final String subtitle;
   final IconData icon;
   final Color accent;
+  final VoidCallback? onTap;
 
   const FeatureTile({
     super.key,
@@ -370,11 +384,12 @@ class FeatureTile extends StatelessWidget {
     required this.subtitle,
     required this.icon,
     required this.accent,
+    this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    final tile = Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
@@ -389,7 +404,6 @@ class FeatureTile extends StatelessWidget {
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Container(
             width: 42,
@@ -400,26 +414,37 @@ class FeatureTile extends StatelessWidget {
             ),
             child: Icon(icon, color: accent),
           ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                  color: HackPrixColors.text,
-                ),
+          const Spacer(),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              title,
+              maxLines: 1,
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+                color: HackPrixColors.text,
               ),
-              const SizedBox(height: 4),
-              Text(
-                subtitle,
-                style: const TextStyle(fontSize: 12, color: Color(0xFF6B7A90)),
-              ),
-            ],
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            subtitle,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontSize: 12, color: Color(0xFF6B7A90)),
           ),
         ],
       ),
+    );
+
+    if (onTap == null) return tile;
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(26),
+      child: tile,
     );
   }
 }
@@ -630,6 +655,85 @@ class _PlaceholderPage extends StatelessWidget {
 class OrganizerPanelPage extends StatelessWidget {
   const OrganizerPanelPage({super.key});
 
+  void _confirmResetSeats(BuildContext context) {
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Reset All Seats?'),
+          content: const Text(
+            'This will clear all seat assignments in Firestore. This cannot be undone.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: HackPrixColors.purple,
+              ),
+              onPressed: () {
+                Navigator.pop(dialogContext);
+                _resetSeats(context);
+              },
+              child: const Text('Reset'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _resetSeats(BuildContext context) async {
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) {
+        return const PopScope(
+          canPop: false,
+          child: Center(
+            child: Card(
+              child: Padding(
+                padding: EdgeInsets.all(28),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    CircularProgressIndicator(color: HackPrixColors.purple),
+                    SizedBox(height: 16),
+                    Text(
+                      'Resetting seats...',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        color: HackPrixColors.text,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+
+    try {
+      await SeatResetService().resetAll();
+
+      if (!context.mounted) return;
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('All seats reset successfully')),
+      );
+    } catch (_) {
+      if (!context.mounted) return;
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Failed to reset seats. Please try again.')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -671,11 +775,7 @@ class OrganizerPanelPage extends StatelessWidget {
             subtitle: 'Clear current seat occupancy',
             accent: HackPrixColors.purple,
             icon: Icons.restart_alt,
-            onTap: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Reset flow will be wired next')),
-              );
-            },
+            onTap: () => _confirmResetSeats(context),
           ),
           const SizedBox(height: 12),
           _OrganizerActionTile(
@@ -684,9 +784,10 @@ class OrganizerPanelPage extends StatelessWidget {
             accent: HackPrixColors.cyan,
             icon: Icons.notifications_active,
             onTap: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Notification flow will be wired next'),
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const OrganizerNotificationScreen(),
                 ),
               );
             },
