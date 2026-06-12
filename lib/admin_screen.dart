@@ -141,29 +141,34 @@ class AdminScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: Text("Admin Panel"), backgroundColor: Colors.black),
-      body: StreamBuilder(
-        stream: FirebaseFirestore.instance.collection('seats').snapshots(),
-        builder: (context, snapshot) {
-          if (!snapshot.hasData) {
-            return Center(child: CircularProgressIndicator());
-          }
-
-          var seats = snapshot.data!.docs;
-
-          int total = seats.length;
-          int occupied = seats.where((s) => s['status'] == 'occupied').length;
-          int available = seats.where((s) => s['status'] == 'available').length;
-
-          Set teams = {};
-          for (var seat in seats) {
-            if (seat.data().containsKey('team')) {
-              teams.add(seat['team']);
+      body: SafeArea(
+        child: StreamBuilder(
+          stream: FirebaseFirestore.instance.collection('seats').snapshots(),
+          builder: (context, snapshot) {
+            if (!snapshot.hasData) {
+              return Center(child: CircularProgressIndicator());
             }
-          }
 
-          return SingleChildScrollView(
-            child: Padding(
-              padding: const EdgeInsets.all(20),
+            var seats = snapshot.data!.docs;
+
+            int total = seats.length;
+            int occupied = seats.where((s) => s['status'] == 'occupied').length;
+            int available = seats.where((s) => s['status'] == 'available').length;
+
+            Set teams = {};
+            for (var seat in seats) {
+              if (seat.data().containsKey('team')) {
+                teams.add(seat['team']);
+              }
+            }
+
+            return SingleChildScrollView(
+              padding: EdgeInsets.only(
+                left: 20,
+                right: 20,
+                top: 20,
+                bottom: MediaQuery.of(context).padding.bottom + 32,
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -211,9 +216,9 @@ class AdminScreen extends StatelessWidget {
                   ),
                 ],
               ),
-            ),
-          );
-        },
+            );
+          },
+        ),
       ),
     );
   }

@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'main.dart';
+import 'notification_category.dart';
 
 class OrganizerNotificationScreen extends StatefulWidget {
   const OrganizerNotificationScreen({super.key});
@@ -14,6 +15,7 @@ class _OrganizerNotificationScreenState
     extends State<OrganizerNotificationScreen> {
   final _messageController = TextEditingController();
   bool _sending = false;
+  NotificationCategory _selectedCategory = NotificationCategory.general;
 
   @override
   void dispose() {
@@ -105,6 +107,7 @@ class _OrganizerNotificationScreenState
     try {
       await FirebaseFirestore.instance.collection('notifications').add({
         'message': message,
+        'category': _selectedCategory.name,
         'timestamp': FieldValue.serverTimestamp(),
       });
 
@@ -127,9 +130,15 @@ class _OrganizerNotificationScreenState
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Send Notification')),
-      body: ListView(
-        padding: const EdgeInsets.all(20),
-        children: [
+      body: SafeArea(
+        child: ListView(
+          padding: EdgeInsets.only(
+            left: 20,
+            right: 20,
+            top: 20,
+            bottom: MediaQuery.of(context).padding.bottom + 32,
+          ),
+          children: [
           const HackPrixRibbon(),
           const SizedBox(height: 18),
           const Text(
@@ -158,6 +167,33 @@ class _OrganizerNotificationScreenState
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                DropdownButtonFormField<NotificationCategory>(
+                  value: _selectedCategory,
+                  decoration: const InputDecoration(
+                    labelText: 'Category',
+                  ),
+                  items: NotificationCategory.values
+                      .map(
+                        (category) => DropdownMenuItem(
+                          value: category,
+                          child: Row(
+                            children: [
+                              Icon(category.icon, color: category.accent, size: 20),
+                              const SizedBox(width: 10),
+                              Text(category.label),
+                            ],
+                          ),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: _sending
+                      ? null
+                      : (value) {
+                          if (value == null) return;
+                          setState(() => _selectedCategory = value);
+                        },
+                ),
+                const SizedBox(height: 16),
                 TextField(
                   controller: _messageController,
                   maxLines: 5,
@@ -277,6 +313,34 @@ class _OrganizerNotificationScreenState
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
+                                Builder(
+                                  builder: (context) {
+                                    final category =
+                                        NotificationCategory.fromValue(
+                                      doc.data()['category'] as String?,
+                                    );
+
+                                    return Row(
+                                      children: [
+                                        Icon(
+                                          category.icon,
+                                          size: 16,
+                                          color: category.accent,
+                                        ),
+                                        const SizedBox(width: 6),
+                                        Text(
+                                          category.label,
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w700,
+                                            color: category.accent,
+                                          ),
+                                        ),
+                                      ],
+                                    );
+                                  },
+                                ),
+                                const SizedBox(height: 8),
                                 Text(
                                   doc.data()['message'] as String? ?? '',
                                   style: const TextStyle(
@@ -318,6 +382,7 @@ class _OrganizerNotificationScreenState
             },
           ),
         ],
+        ),
       ),
     );
   }

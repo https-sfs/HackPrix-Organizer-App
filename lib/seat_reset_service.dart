@@ -16,11 +16,23 @@ class SeatResetService {
       final chunk = snapshot.docs.skip(i).take(_batchLimit);
 
       for (final doc in chunk) {
-        batch.update(doc.reference, {
-          'status': 'available',
-          'team': '',
-          'timestamp': FieldValue.delete(),
-        });
+        final data = doc.data();
+        final updates = <String, dynamic>{
+          'occupied': false,
+          'teamName': '',
+        };
+
+        if (data.containsKey('timestamp')) {
+          updates['timestamp'] = FieldValue.delete();
+        }
+        if (data.containsKey('status')) {
+          updates['status'] = 'available';
+        }
+        if (data.containsKey('team')) {
+          updates['team'] = '';
+        }
+
+        batch.update(doc.reference, updates);
       }
 
       await batch.commit();

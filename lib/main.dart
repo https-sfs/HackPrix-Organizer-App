@@ -1,12 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'notification_service.dart';
 import 'seat_reset_service.dart';
 import 'seat_screen.dart';
 import 'organizer_notification_screen.dart';
 import 'announcements_screen.dart';
+import 'my_seat_page.dart';
+import 'schedule_page.dart';
+import 'guidelines_page.dart';
 import 'admin_screen.dart';
+
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -14,7 +19,7 @@ void main() async {
   FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
   await NotificationService.instance.initialize();
   runApp(const HackPrixApp());
-}
+  }
 
 class HackPrixColors {
   static const blue = Color(0xFF2D6BFF);
@@ -88,6 +93,10 @@ class HackPrixApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       title: 'HackPrix',
       theme: buildHackPrixTheme(),
+      navigatorKey: hackPrixNavigatorKey,
+      routes: {
+        '/announcements': (_) => const AnnouncementsScreen(),
+      },
       home: const ParticipantShell(),
     );
   }
@@ -103,13 +112,14 @@ class ParticipantShell extends StatefulWidget {
 class _ParticipantShellState extends State<ParticipantShell> {
   int _index = 0;
 
-  final List<Widget> _pages = const [
-    ParticipantHomePage(),
-    MySeatPage(),
-    SchedulePage(),
-    AnnouncementsPage(),
-    HelpPage(),
-  ];
+  @override
+  void initState() {
+    super.initState();
+    NotificationService.instance.onViewUpdates = (context) {
+      Navigator.of(context).popUntil((route) => route.isFirst);
+      setState(() => _index = 3);
+    };
+  }
 
   void _openOrganizerGate() {
     final pinController = TextEditingController();
@@ -158,55 +168,70 @@ class _ParticipantShellState extends State<ParticipantShell> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: GestureDetector(
-          onLongPress: _openOrganizerGate,
-          child: const Text('HackPrix'),
+    final pages = [
+      const ParticipantHomePage(),
+      const MySeatPage(),
+      const SchedulePage(),
+      const AnnouncementsScreen(),
+      const GuidelinesPage(),
+    ];
+
+    return PopScope(
+      canPop: _index == 0,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        setState(() => _index = 0);
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: GestureDetector(
+            onLongPress: _openOrganizerGate,
+            child: const Text('HackPrix'),
+          ),
+          actions: [
+            IconButton(
+              onPressed: _openOrganizerGate,
+              icon: const Icon(Icons.shield_outlined),
+              tooltip: 'Organizer access',
+            ),
+          ],
         ),
-        actions: [
-          IconButton(
-            onPressed: _openOrganizerGate,
-            icon: const Icon(Icons.shield_outlined),
-            tooltip: 'Organizer access',
-          ),
-        ],
-      ),
-      body: IndexedStack(index: _index, children: _pages),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _index,
-        onDestinationSelected: (value) {
-          setState(() => _index = value);
-        },
-        backgroundColor: Colors.white,
-        indicatorColor: HackPrixColors.blue.withValues(alpha: 0.12),
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.home_outlined),
-            selectedIcon: Icon(Icons.home),
-            label: 'Home',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.event_seat_outlined),
-            selectedIcon: Icon(Icons.event_seat),
-            label: 'My Seat',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.schedule_outlined),
-            selectedIcon: Icon(Icons.schedule),
-            label: 'Schedule',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.notifications_none),
-            selectedIcon: Icon(Icons.notifications),
-            label: 'Updates',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.help_outline),
-            selectedIcon: Icon(Icons.help),
-            label: 'Help',
-          ),
-        ],
+        body: IndexedStack(index: _index, children: pages),
+        bottomNavigationBar: NavigationBar(
+          selectedIndex: _index,
+          onDestinationSelected: (value) {
+            setState(() => _index = value);
+          },
+          backgroundColor: Colors.white,
+          indicatorColor: HackPrixColors.blue.withValues(alpha: 0.12),
+          destinations: const [
+            NavigationDestination(
+              icon: Icon(Icons.home_outlined),
+              selectedIcon: Icon(Icons.home),
+              label: 'Home',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.event_seat_outlined),
+              selectedIcon: Icon(Icons.event_seat),
+              label: 'My Seat',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.schedule_outlined),
+              selectedIcon: Icon(Icons.schedule),
+              label: 'Schedule',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.notifications_none),
+              selectedIcon: Icon(Icons.notifications),
+              label: 'Updates',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.help_outline),
+              selectedIcon: Icon(Icons.help),
+              label: 'Guidelines',
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -239,10 +264,31 @@ class HackPrixRibbon extends StatelessWidget {
 class ParticipantHomePage extends StatelessWidget {
   const ParticipantHomePage({super.key});
 
+  void _openFeaturePage(
+    BuildContext context, {
+    required String title,
+    required Widget page,
+  }) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => Scaffold(
+          appBar: AppBar(title: Text(title)),
+          body: SafeArea(child: page),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
+      padding: EdgeInsets.only(
+        left: 20,
+        right: 20,
+        top: 20,
+        bottom: MediaQuery.of(context).padding.bottom + 32,
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -317,17 +363,27 @@ class ParticipantHomePage extends StatelessWidget {
             mainAxisSpacing: 14,
             childAspectRatio: 1.2,
             children: [
-              const FeatureTile(
+              FeatureTile(
                 title: 'My Seat',
                 subtitle: 'Your lab + seat',
                 icon: Icons.event_seat,
                 accent: HackPrixColors.orange,
+                onTap: () => _openFeaturePage(
+                  context,
+                  title: 'My Seat',
+                  page: const MySeatPage(),
+                ),
               ),
-              const FeatureTile(
+              FeatureTile(
                 title: 'Schedule',
                 subtitle: 'Day-wise flow',
                 icon: Icons.schedule,
                 accent: HackPrixColors.cyan,
+                onTap: () => _openFeaturePage(
+                  context,
+                  title: 'Schedule',
+                  page: const SchedulePage(),
+                ),
               ),
               FeatureTile(
                 title: 'Announcements',
@@ -343,32 +399,20 @@ class ParticipantHomePage extends StatelessWidget {
                   );
                 },
               ),
-              const FeatureTile(
+              FeatureTile(
                 title: 'Guidelines',
-                subtitle: 'Rules & help',
+                subtitle: 'Event Guidelines',
                 icon: Icons.menu_book,
                 accent: HackPrixColors.lime,
+                onTap: () => _openFeaturePage(
+                  context,
+                  title: 'Guidelines',
+                  page: const GuidelinesPage(),
+                ),
               ),
             ],
           ),
 
-          const SizedBox(height: 18),
-
-          _SectionTitle(title: 'Quick Notes', accent: HackPrixColors.yellow),
-          const SizedBox(height: 10),
-          const _NoteCard(
-            title: 'Entry flow',
-            body:
-                'Check-in should be quick, no confusion, and usable during event pressure.',
-            accent: HackPrixColors.blue,
-          ),
-          const SizedBox(height: 12),
-          const _NoteCard(
-            title: 'Organizer tools',
-            body:
-                'Hidden inside the same app, protected by PIN, so participants do not see control tools.',
-            accent: HackPrixColors.purple,
-          ),
         ],
       ),
     );
@@ -393,166 +437,81 @@ class FeatureTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tile = Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(26),
-        boxShadow: [
-          BoxShadow(
-            color: accent.withValues(alpha: 0.10),
-            blurRadius: 24,
-            offset: const Offset(0, 10),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 42,
-            height: 42,
-            decoration: BoxDecoration(
-              color: accent.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Icon(icon, color: accent),
-          ),
-          const Spacer(),
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            alignment: Alignment.centerLeft,
-            child: Text(
-              title,
-              maxLines: 1,
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-                color: HackPrixColors.text,
-              ),
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            subtitle,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontSize: 12, color: Color(0xFF6B7A90)),
-          ),
-        ],
-      ),
-    );
-
-    if (onTap == null) return tile;
-
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(26),
-      child: tile,
-    );
-  }
-}
-
-class _SectionTitle extends StatelessWidget {
-  final String title;
-  final Color accent;
-
-  const _SectionTitle({required this.title, required this.accent});
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
+    final borderRadius = BorderRadius.circular(26);
+    final content = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Container(
-          width: 10,
-          height: 10,
-          decoration: BoxDecoration(color: accent, shape: BoxShape.circle),
-        ),
-        const SizedBox(width: 8),
-        Text(
-          title,
-          style: const TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.w800,
-            color: HackPrixColors.text,
+          width: 42,
+          height: 42,
+          decoration: BoxDecoration(
+            color: accent.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(14),
           ),
+          child: Icon(icon, color: accent),
         ),
-      ],
-    );
-  }
-}
-
-class _NoteCard extends StatelessWidget {
-  final String title;
-  final String body;
-  final Color accent;
-
-  const _NoteCard({
-    required this.title,
-    required this.body,
-    required this.accent,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: accent.withValues(alpha: 0.20)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
+        const Spacer(),
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerLeft,
+          child: Text(
             title,
+            maxLines: 1,
             style: const TextStyle(
-              fontSize: 16,
+              fontSize: 18,
               fontWeight: FontWeight.w700,
               color: HackPrixColors.text,
             ),
           ),
-          const SizedBox(height: 8),
-          Text(
-            body,
-            style: const TextStyle(
-              fontSize: 13,
-              height: 1.45,
-              color: Color(0xFF5B6B80),
-            ),
-          ),
-        ],
+        ),
+        const SizedBox(height: 4),
+        Text(
+          subtitle,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(fontSize: 12, color: Color(0xFF6B7A90)),
+        ),
+      ],
+    );
+
+    final shadow = BoxShadow(
+      color: accent.withValues(alpha: 0.10),
+      blurRadius: 24,
+      offset: const Offset(0, 10),
+    );
+
+    if (onTap == null) {
+      return Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: borderRadius,
+          boxShadow: [shadow],
+        ),
+        child: content,
+      );
+    }
+
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: borderRadius,
+        boxShadow: [shadow],
       ),
-    );
-  }
-}
-
-class MySeatPage extends StatelessWidget {
-  const MySeatPage({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return const _PlaceholderPage(
-      title: 'My Seat',
-      subtitle: 'Your seat details will appear here after check-in.',
-      icon: Icons.event_seat,
-      accent: HackPrixColors.orange,
-    );
-  }
-}
-
-class SchedulePage extends StatelessWidget {
-  const SchedulePage({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return const _PlaceholderPage(
-      title: 'Schedule',
-      subtitle: 'Day-wise event flow will go here.',
-      icon: Icons.schedule,
-      accent: HackPrixColors.cyan,
+      child: Material(
+        color: Colors.white,
+        borderRadius: borderRadius,
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: borderRadius,
+          splashColor: accent.withValues(alpha: 0.16),
+          highlightColor: accent.withValues(alpha: 0.08),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: content,
+          ),
+        ),
+      ),
     );
   }
 }
@@ -567,20 +526,6 @@ class AnnouncementsPage extends StatelessWidget {
       subtitle: 'Organizer updates will show here in real time.',
       icon: Icons.campaign,
       accent: HackPrixColors.purple,
-    );
-  }
-}
-
-class HelpPage extends StatelessWidget {
-  const HelpPage({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return const _PlaceholderPage(
-      title: 'Help',
-      subtitle: 'Support contacts, guidelines, and event help.',
-      icon: Icons.help,
-      accent: HackPrixColors.lime,
     );
   }
 }
@@ -659,14 +604,61 @@ class _PlaceholderPage extends StatelessWidget {
 class OrganizerPanelPage extends StatelessWidget {
   const OrganizerPanelPage({super.key});
 
+  static const _resetOrganizerPin = '8086';
+
   void _confirmResetSeats(BuildContext context) {
+    final pinController = TextEditingController();
+
     showDialog<void>(
       context: context,
       builder: (dialogContext) {
         return AlertDialog(
-          title: const Text('Reset All Seats?'),
+          title: const Text('Organizer PIN Required'),
+          content: TextField(
+            controller: pinController,
+            keyboardType: TextInputType.number,
+            obscureText: true,
+            decoration: const InputDecoration(
+              labelText: 'Enter Organizer PIN',
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: HackPrixColors.purple,
+              ),
+              onPressed: () {
+                if (pinController.text.trim() != _resetOrganizerPin) {
+                  Navigator.pop(dialogContext);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Incorrect Organizer PIN')),
+                  );
+                  return;
+                }
+
+                Navigator.pop(dialogContext);
+                _showFinalResetConfirmation(context);
+              },
+              child: const Text('Continue'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showFinalResetConfirmation(BuildContext context) {
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('⚠️ Final Confirmation'),
           content: const Text(
-            'This will clear all seat assignments in Firestore. This cannot be undone.',
+            'This will permanently remove ALL seat allocations from HackPrix.\nThis action cannot be undone.',
           ),
           actions: [
             TextButton(
@@ -681,7 +673,7 @@ class OrganizerPanelPage extends StatelessWidget {
                 Navigator.pop(dialogContext);
                 _resetSeats(context);
               },
-              child: const Text('Reset'),
+              child: const Text('Yes, Reset'),
             ),
           ],
         );
@@ -742,9 +734,15 @@ class OrganizerPanelPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Organizer Panel')),
-      body: ListView(
-        padding: const EdgeInsets.all(20),
-        children: [
+      body: SafeArea(
+        child: ListView(
+          padding: EdgeInsets.only(
+            left: 20,
+            right: 20,
+            top: 20,
+            bottom: MediaQuery.of(context).padding.bottom + 32,
+          ),
+          children: [
           const HackPrixRibbon(),
           const SizedBox(height: 18),
           const Text(
@@ -761,6 +759,8 @@ class OrganizerPanelPage extends StatelessWidget {
             style: TextStyle(fontSize: 14, color: Color(0xFF5B6B80)),
           ),
           const SizedBox(height: 18),
+          const _OrganizerLiveStatsDashboard(),
+          const SizedBox(height: 24),
           _OrganizerActionTile(
             title: 'Seat Allotment',
             subtitle: 'Assign adjacent seats to teams',
@@ -796,17 +796,219 @@ class OrganizerPanelPage extends StatelessWidget {
               );
             },
           ),
-          const SizedBox(height: 12),
-          _OrganizerActionTile(
-            title: 'Live Stats',
-            subtitle: 'View occupancy and team counts',
-            accent: HackPrixColors.lime,
-            icon: Icons.insights,
-            onTap: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Live stats page will come next')),
-              );
-            },
+        ],
+        ),
+      ),
+    );
+  }
+}
+
+class _OrganizerSeatStats {
+  final int totalSeats;
+  final int occupiedSeats;
+  final int availableSeats;
+  final int teamsAssigned;
+  final int labsFilled;
+
+  const _OrganizerSeatStats({
+    required this.totalSeats,
+    required this.occupiedSeats,
+    required this.availableSeats,
+    required this.teamsAssigned,
+    required this.labsFilled,
+  });
+
+  factory _OrganizerSeatStats.fromDocs(
+    List<QueryDocumentSnapshot<Map<String, dynamic>>> docs,
+  ) {
+    var occupiedSeats = 0;
+    final teams = <String>{};
+    final occupiedByLab = <String, int>{};
+
+    for (final doc in docs) {
+      final data = doc.data();
+      final occupied =
+          data['occupied'] == true || data['status'] == 'occupied';
+
+      if (occupied) {
+        occupiedSeats++;
+        final labName = data['labName'] as String?;
+        if (labName != null && labName.isNotEmpty) {
+          occupiedByLab[labName] = (occupiedByLab[labName] ?? 0) + 1;
+        }
+      }
+
+      final teamName =
+          (data['teamName'] as String? ?? data['team'] as String? ?? '')
+              .trim();
+      if (teamName.isNotEmpty) {
+        teams.add(teamName);
+      }
+    }
+
+    final totalSeats = SeatAllotmentLabs.labs.fold<int>(
+      0,
+      (sum, lab) => sum + lab.value,
+    );
+
+    var labsFilled = 0;
+    for (final lab in SeatAllotmentLabs.labs) {
+      if ((occupiedByLab[lab.key] ?? 0) > 0) {
+        labsFilled++;
+      }
+    }
+
+    return _OrganizerSeatStats(
+      totalSeats: totalSeats,
+      occupiedSeats: occupiedSeats,
+      availableSeats: totalSeats - occupiedSeats,
+      teamsAssigned: teams.length,
+      labsFilled: labsFilled,
+    );
+  }
+}
+
+class _OrganizerLiveStatsDashboard extends StatelessWidget {
+  const _OrganizerLiveStatsDashboard();
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream: FirebaseFirestore.instance.collection('seats').snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting &&
+            !snapshot.hasData) {
+          return const Padding(
+            padding: EdgeInsets.symmetric(vertical: 32),
+            child: Center(child: CircularProgressIndicator()),
+          );
+        }
+
+        final stats = _OrganizerSeatStats.fromDocs(snapshot.data?.docs ?? []);
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Live Stats',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w800,
+                color: HackPrixColors.text,
+              ),
+            ),
+            const SizedBox(height: 12),
+            _OrganizerSummaryCards(stats: stats),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _OrganizerSummaryCards extends StatelessWidget {
+  final _OrganizerSeatStats stats;
+
+  const _OrganizerSummaryCards({required this.stats});
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final cardWidth = constraints.maxWidth > 720
+            ? (constraints.maxWidth - 24) / 3
+            : (constraints.maxWidth - 12) / 2;
+
+        return Wrap(
+          spacing: 12,
+          runSpacing: 12,
+          children: [
+            _OrganizerStatCard(
+              width: cardWidth,
+              label: 'Total Seats',
+              value: '${stats.totalSeats}',
+              accent: HackPrixColors.blue,
+            ),
+            _OrganizerStatCard(
+              width: cardWidth,
+              label: 'Occupied Seats',
+              value: '${stats.occupiedSeats}',
+              accent: const Color(0xFFE53935),
+            ),
+            _OrganizerStatCard(
+              width: cardWidth,
+              label: 'Available Seats',
+              value: '${stats.availableSeats}',
+              accent: const Color(0xFF43A047),
+            ),
+            _OrganizerStatCard(
+              width: cardWidth,
+              label: 'Teams Assigned',
+              value: '${stats.teamsAssigned}',
+              accent: HackPrixColors.purple,
+            ),
+            _OrganizerStatCard(
+              width: cardWidth,
+              label: 'Labs Filled',
+              value: '${stats.labsFilled}',
+              accent: HackPrixColors.orange,
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _OrganizerStatCard extends StatelessWidget {
+  final double width;
+  final String label;
+  final String value;
+  final Color accent;
+
+  const _OrganizerStatCard({
+    required this.width,
+    required this.label,
+    required this.value,
+    required this.accent,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: width,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: accent.withValues(alpha: 0.16)),
+        boxShadow: [
+          BoxShadow(
+            color: accent.withValues(alpha: 0.08),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 28,
+              fontWeight: FontWeight.w800,
+              color: accent,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF5B6B80),
+            ),
           ),
         ],
       ),

@@ -19,38 +19,46 @@ class NotificationsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: Text("Notifications")),
-      body: StreamBuilder(
-        stream: FirebaseFirestore.instance
-            .collection('notifications')
-            .orderBy('timestamp', descending: true)
-            .snapshots(),
-        builder: (context, snapshot) {
-          if (!snapshot.hasData) {
-            return Center(child: CircularProgressIndicator());
-          }
+      body: SafeArea(
+        child: StreamBuilder(
+          stream: FirebaseFirestore.instance
+              .collection('notifications')
+              .orderBy('timestamp', descending: true)
+              .snapshots(),
+          builder: (context, snapshot) {
+            if (!snapshot.hasData) {
+              return Center(child: CircularProgressIndicator());
+            }
 
-          var docs = snapshot.data!.docs;
+            var docs = snapshot.data!.docs;
 
-          return ListView.builder(
-            itemCount: docs.length,
-            itemBuilder: (context, index) {
-              var data = docs[index];
+            return ListView.builder(
+              padding: EdgeInsets.only(
+                left: 20,
+                right: 20,
+                top: 20,
+                bottom: MediaQuery.of(context).padding.bottom + 32,
+              ),
+              itemCount: docs.length,
+              itemBuilder: (context, index) {
+                var data = docs[index];
 
-              return Container(
-                margin: EdgeInsets.all(10),
-                padding: EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: getColor(data['type']).withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: ListTile(
-                  title: Text(data['title']),
-                  subtitle: Text(data['message']),
-                ),
-              );
-            },
-          );
-        },
+                return Container(
+                  margin: EdgeInsets.all(10),
+                  padding: EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: getColor(data['type']).withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: ListTile(
+                    title: Text(data['title']),
+                    subtitle: Text(data['message']),
+                  ),
+                );
+              },
+            );
+          },
+        ),
       ),
     );
   }

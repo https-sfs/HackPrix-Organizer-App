@@ -2,8 +2,15 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/widgets.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'in_app_notification_popup.dart';
+import 'notification_category.dart';
+
+final GlobalKey<NavigatorState> hackPrixNavigatorKey =
+    GlobalKey<NavigatorState>();
+
+typedef NotificationNavigationHandler = void Function(BuildContext context);
 
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -29,6 +36,8 @@ class NotificationService {
         importance: Importance.high,
       );
 
+  NotificationNavigationHandler? onViewUpdates;
+
   Future<void> initialize() async {
     await setupLocalNotifications();
     await _requestPermissions();
@@ -36,6 +45,13 @@ class NotificationService {
     _listenForTokenRefresh();
     _listenForForegroundMessages();
     _listenForBackgroundOpen();
+
+    final initialMessage = await FirebaseMessaging.instance.getInitialMessage();
+    if (initialMessage != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _navigateToUpdates();
+      });
+    }
   }
 
   static Future<void> setupLocalNotifications() async {
@@ -105,30 +121,71 @@ class NotificationService {
   }
 
   void _listenForForegroundMessages() {
-    FirebaseMessaging.onMessage.listen((RemoteMessage message) async {
+    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
       debugPrint('Foreground FCM message received: ${message.messageId}');
-      await displayNotification(message);
+      _showInAppPopup(message);
     });
   }
 
   void _listenForBackgroundOpen() {
     FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
       debugPrint('Notification opened app: ${message.messageId}');
+      _navigateToUpdates();
     });
   }
 
-  static Future<void> displayNotification(RemoteMessage message) async {
+  void _navigateToUpdates() {
+    final context = hackPrixNavigatorKey.currentContext;
+    if (context == null) return;
+
+    if (onViewUpdates != null) {
+      onViewUpdates!(context);
+      return;
+    }
+
+    Navigator.of(context).pushNamed('/announcements');
+  }
+
+  void _showInAppPopup(RemoteMessage message) {
+    final context = hackPrixNavigatorKey.currentContext;
+    if (context == null) return;
+
+    final parsed = _parseMessage(message);
+    if (parsed == null) return;
+
+    InAppNotificationPopup.show(
+      context,
+      title: parsed.title,
+      body: parsed.body,
+      category: parsed.category,
+      onViewUpdates: _navigateToUpdates,
+    );
+  }
+
+  static _ParsedNotification? _parseMessage(RemoteMessage message) {
     final notification = message.notification;
+    final category = NotificationCategory.fromValue(message.data['category']);
     final dataMessage = message.data['message'];
-    final title =
-        notification?.title ?? message.data['title'] ?? 'HackPrix';
-    final body =
-        notification?.body ??
+    final title = notification?.title ??
+        message.data['title'] ??
+        category.popupTitle;
+    final body = notification?.body ??
         message.data['body'] ??
         dataMessage ??
         'You have a new update.';
 
-    if (title.isEmpty && body.isEmpty) return;
+    if (title.isEmpty && body.isEmpty) return null;
+
+    return _ParsedNotification(
+      title: title,
+      body: body,
+      category: category,
+    );
+  }
+
+  static Future<void> displayNotification(RemoteMessage message) async {
+    final parsed = _parseMessage(message);
+    if (parsed == null) return;
 
     final androidDetails = AndroidNotificationDetails(
       _androidChannel.id,
@@ -141,8 +198,8 @@ class NotificationService {
 
     await _localNotifications.show(
       message.hashCode,
-      title,
-      body,
+      parsed.title,
+      parsed.body,
       NotificationDetails(
         android: androidDetails,
         iOS: const DarwinNotificationDetails(
@@ -154,4 +211,16 @@ class NotificationService {
       payload: message.data.toString(),
     );
   }
+}
+
+class _ParsedNotification {
+  final String title;
+  final String body;
+  final NotificationCategory category;
+
+  const _ParsedNotification({
+    required this.title,
+    required this.body,
+    required this.category,
+  });
 }
