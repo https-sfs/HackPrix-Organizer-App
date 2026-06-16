@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'app_bootstrap.dart';
+import 'firebase_initializer.dart';
 import 'notification_service.dart';
 import 'seat_reset_service.dart';
 import 'seat_screen.dart';
@@ -15,11 +15,10 @@ import 'admin_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp();
-  FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
-  await NotificationService.instance.initialize();
+  await initializeFirebase();
+  await bootstrapApp();
   runApp(const HackPrixApp());
-  }
+}
 
 class HackPrixColors {
   static const blue = Color(0xFF2D6BFF);
@@ -95,9 +94,39 @@ class HackPrixApp extends StatelessWidget {
       theme: buildHackPrixTheme(),
       navigatorKey: hackPrixNavigatorKey,
       routes: {
-        '/announcements': (_) => const AnnouncementsScreen(),
+        '/announcements': (_) => const ResponsiveAppShell(
+          child: AnnouncementsScreen(),
+        ),
       },
-      home: const ParticipantShell(),
+      home: const ResponsiveAppShell(child: ParticipantShell()),
+    );
+  }
+}
+
+class ResponsiveAppShell extends StatelessWidget {
+  final Widget child;
+
+  const ResponsiveAppShell({super.key, required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = constraints.maxWidth;
+        final maxContentWidth = width >= 1200
+            ? 960.0
+            : width >= 900
+            ? 820.0
+            : width;
+
+        return Align(
+          alignment: Alignment.topCenter,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: maxContentWidth),
+            child: child,
+          ),
+        );
+      },
     );
   }
 }
@@ -144,7 +173,7 @@ class _ParticipantShellState extends State<ParticipantShell> {
             ),
             FilledButton(
               onPressed: () {
-                if (pinController.text.trim() == '19090304') {
+                if (pinController.text.trim() == '0304') {
                   Navigator.pop(context);
                   Navigator.push(
                     context,
@@ -604,7 +633,7 @@ class _PlaceholderPage extends StatelessWidget {
 class OrganizerPanelPage extends StatelessWidget {
   const OrganizerPanelPage({super.key});
 
-  static const _resetOrganizerPin = '8086';
+  static const _resetOrganizerPin = '9016';
 
   void _confirmResetSeats(BuildContext context) {
     final pinController = TextEditingController();

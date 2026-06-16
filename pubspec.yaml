@@ -12,10 +12,10 @@ dependencies:
   flutter:
     sdk: flutter
 
-  firebase_core: ^2.32.0
-  cloud_firestore: ^4.15.0
-  firebase_messaging: ^14.7.10
-  flutter_local_notifications: ^17.2.4
+  firebase_core: ^3.8.1
+  cloud_firestore: ^5.6.0
+  firebase_messaging: ^15.2.4
+  flutter_local_notifications: ^18.0.1
 
   cupertino_icons: ^1.0.8
 
@@ -38,3 +38,8 @@ flutter_launcher_icons:
   image_path: "assets/hackprix_logo.png"
   adaptive_icon_background: "#FFFFFF"
   adaptive_icon_foreground: "assets/hackprix_logo.png"
+  web:
+    generate: true
+    image_path: "assets/hackprix_logo.png"
+    background_color: "#FFFFFF"
+    theme_color: "#2D6BFF"
